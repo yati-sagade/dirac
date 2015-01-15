@@ -6,6 +6,7 @@ import org.opencv.imgproc.*;
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
 
+import android.content.res.*;
 import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
@@ -15,12 +16,37 @@ import android.support.v4.view.*;
 import android.view.*;
 
 
+import java.io.*;
 import java.util.*;
 
 public class MainActivity extends Activity implements CvCameraViewListener2 {
-
+    private static final int NUM_COMPARTMENTS = 12;
     private CameraBridgeViewBase cameraView = null;
     private BlurType blurType = BlurType.GAUSSIAN;
+    private SoundPool soundPool = new SoundPool.Builder()
+                                      .setMaxStreams(NUM_COMPARTMENTS)
+                                      .build();
+
+    private static final String[] SOUND_FILES = new String[] {
+        "piano-g.wav",
+        "piano-gs.wav",
+        "piano-a.wav",
+        "piano-bb.wav",
+        "piano-b.wav",
+        "piano-c.wav",
+        "piano-cs.wav",
+        "piano-d.wav",
+        "piano-eb.wav",
+        "piano-e.wav",
+        "piano-f.wav",
+        "piano-fs.wav",
+    };
+
+    private int[] soundIds = new int[NUM_COMPARTMENTS];
+
+    
+    // To store the current status of compartments.
+    private boolean[] compartmentStatuses = new boolean[NUM_COMPARTMENTS];
 
     /** Called when the activity is first created. */
     @Override
@@ -33,6 +59,17 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         cameraView = (CameraBridgeViewBase) findViewById(R.id.cameraview);
         cameraView.setVisibility(SurfaceView.VISIBLE);
         cameraView.setCvCameraViewListener(this);
+
+        for (int i = 0; i < NUM_COMPARTMENTS; ++i) {
+            String soundFile = SOUND_FILES[i];
+            try {
+                AssetFileDescriptor afd = getAssets().openFd(soundFile);
+                soundIds[i] = soundPool.load(afd, 1);
+            } catch (IOException ioe) {
+                Util.log("Error loading asset: " + ioe);
+            }
+
+        }
     }
 
     @Override
@@ -54,6 +91,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         if (cameraView != null) {
             cameraView.disableView();
         }
+        soundPool.release();
         super.onDestroy();
     }
 
@@ -79,21 +117,12 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
     }
 
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
-        if (true) {
-            Mat rgba = inputFrame.rgba();
-            process(rgba.nativeObj);
-            return rgba;
-        }
-        Mat gray = inputFrame.gray();
-        switch (blurType) {
-            case GAUSSIAN:
-                Imgproc.GaussianBlur(gray, gray, new Size(15, 15), 0.0, 0.0);
-                break;
-            case MEDIAN:
-                Imgproc.medianBlur(gray, gray, 15);
-                break;
-        }
-        return gray;
+        Mat rgba = inputFrame.rgba();
+        MatOfInt result = new MatOfInt();
+        process(rgba.nativeObj, result.nativeObj);
+        Set<Integer> indices = new HashSet(result.toList());
+        playSounds(indices);
+        return rgba;
     }
 
     public void onCameraViewStarted(int width, int height) {
@@ -125,6 +154,25 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         MEDIAN
     }
 
-    private native void process(long ptrToMat);
+    private void playSounds(Set<Integer> activeCompartments) {
+        for (int i = 0; i < NUM_COMPARTMENTS; ++i) {
+            // If the compartment was not initially active but is now active
+            if (!compartmentStatuses[i] && activeCompartments.contains(i)) {
+                compartmentStatuses[i] = true;
+                playSound(i);
+            }
+            if (!activeCompartments.contains(i)) {
+                compartmentStatuses[i] = false;
+            }
+        }
+    }
+
+    private void playSound(int index) {
+        int soundId = soundIds[index];
+        soundPool.play(soundId, 1.0f, 1.0f, 0, 0, 1.0f);
+    }
+
+    // Returns the index of the currently active compartment.
+    private native int process(long ptrToImgMat, long ptrToResultMat);
 
 }

@@ -12,8 +12,8 @@ extern "C" {
  * Method:    process
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_com_ysag_dirac_MainActivity_process
-  (JNIEnv *, jobject, jlong);
+JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_process
+  (JNIEnv *, jobject, jlong, jlong);
 
 #ifdef __cplusplus
 }
