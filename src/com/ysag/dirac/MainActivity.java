@@ -28,8 +28,6 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
                                       .build();
 
     private static final String[] SOUND_FILES = new String[] {
-        "piano-g.wav",
-        "piano-gs.wav",
         "piano-a.wav",
         "piano-bb.wav",
         "piano-b.wav",
@@ -40,6 +38,8 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
         "piano-e.wav",
         "piano-f.wav",
         "piano-fs.wav",
+        "piano-g.wav",
+        "piano-gs.wav",
     };
 
     private int[] soundIds = new int[NUM_COMPARTMENTS];
