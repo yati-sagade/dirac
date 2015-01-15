@@ -3,3 +3,4 @@ gen/
 *.swp
 .*.swp
 obj/
+libs/

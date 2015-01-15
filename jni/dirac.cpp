@@ -4,6 +4,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
+#include <set>
 #include <algorithm>
 #include <numeric>
 #include <utility>
@@ -64,8 +65,6 @@ static void activate_compartment(cv::Mat& img, unsigned short comp_width, size_t
 JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_process(JNIEnv *env, jobject obj, jlong ptrToImgMat, jlong ptrToResultMat) {
     cv::Mat &img = *(cv::Mat*) ptrToImgMat; 
     cv::Mat *result = (cv::Mat*) ptrToResultMat;
-    result->create(1, 1, CV_32SC1);
-    result->at<long>(0, 0) = -1;
 
     auto compartment_width = img.cols / NUM_COMPARTMENTS;
 
@@ -80,26 +79,34 @@ JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_process(JNIEnv *env, job
     cv::Canny(gray, canny, 50, 150, 3);
     cv::findContours(canny, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, cv::Point {0, 0});
 
-    auto largest_contour = std::max_element(contours.begin(), contours.end(),
-                                            [] (std::vector<cv::Point>& a, std::vector<cv::Point>& b) {
-                                                return a.size() < b.size();
-                                            });
+    std::set<int> active_compartments;
 
-    if (largest_contour != contours.end()) {
-        auto largest_index = largest_contour - contours.begin();
-        cv::drawContours(img, contours, largest_index, cv::Scalar {0, 255, 0}, 2, 8, hierarchy, 0, cv::Point {});
-        cv::Point cog = center_of_gravity(*largest_contour);
+    cv::Point mid {img.cols / 2, img.rows / 2};
+    std::stringstream ss;
+    for (int i = 0; i < contours.size(); ++i) {
+        auto& contour = contours[i];
+        cv::drawContours(img, contours, i, cv::Scalar {0, 255, 0}, 2, 8, hierarchy, 0, cv::Point {});
+        cv::Point cog = center_of_gravity(contour);
         cv::circle(img, cog, 2, BLUE, -1);
-
         auto comp_index = cog.x / compartment_width;
-        result->at<long>(0, 0) = comp_index;
-        cv::Point mid {img.cols / 2, img.rows / 2};
-        std::stringstream ss;
-        ss << comp_index;
-        cv::putText(img, ss.str(), mid, cv::FONT_HERSHEY_PLAIN, 1.0, BLUE);
-        activate_compartment(img, compartment_width, comp_index);
+        if (active_compartments.find(comp_index) == active_compartments.end()) {
+            active_compartments.insert(comp_index);
+            activate_compartment(img, compartment_width, comp_index);
+            ss << comp_index;
+            if (i != contours.size() - 1) {
+                ss << ",";
+            }
+        }
     }
+    cv::putText(img, ss.str(), mid, cv::FONT_HERSHEY_PLAIN, 1.0, BLUE);
     draw_compartments(img);
+
+    result->create(active_compartments.size(), 1, CV_32SC1);
+    int i = 0;
+    for (auto active_compartment : active_compartments) {
+        result->at<long>(i++, 0) = active_compartment;
+    }
+
     return -1;
 }
 
