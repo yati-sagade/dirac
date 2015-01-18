@@ -42,16 +42,48 @@ static void activate_compartment(cv::Mat& img, unsigned short comp_width, size_t
     cv::rectangle(img, top_left, bot_right, cv::Scalar {255, 0, 0, 100}, -1);
 }
 
+static inline void morph_open(const cv::Mat& src, cv::Mat& dst, cv::Mat& mask) {
+    cv::erode(src, dst, mask);
+    cv::dilate(src, dst, mask);
+}
+
+static inline void morph_close(const cv::Mat& src, cv::Mat& dst, cv::Mat& mask) {
+    cv::dilate(src, dst, mask);
+    cv::erode(src, dst, mask);
+}
+
+static void denoise(cv::Mat& binary) {
+    int w = binary.cols / NUM_COMPARTMENTS;
+
+    cv::Mat mask = cv::getStructuringElement(cv::MORPH_RECT, cv::Size {w, w});
+    morph_close(binary, binary, mask);
+
+    // mask = cv::getStructuringElement(cv::MORPH_RECT, cv::Size {w/2, w/2});
+    // morph_open(binary, binary, mask);
+}
+
+static void detect_led(const cv::Mat& raw, cv::Mat& dst) {
+    cv::Size raw_size {raw.cols, raw.rows};
+    cv::Mat img;
+    cv::resize(raw, img, cv::Size {}, 0.25, 0.25);
+    cv::cvtColor(img, img, CV_RGB2HSV); 
+    // Red LED
+    cv::Scalar lo {165, 240, 143}, hi {178, 255, 255};
+    cv::Mat bw;
+    cv::inRange(img, lo, hi, bw);
+    denoise(bw);
+    dst.create(raw_size, raw.type());
+    cv::resize(bw, dst, raw_size);
+}
+
 JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_find(JNIEnv *env,
                                                              jobject obj,
                                                              jlong ptrToImgMat)
 {
-    cv::Mat &img = *(cv::Mat*) ptrToImgMat;
-    cv::cvtColor(img, img, CV_RGB2HSV); 
-    cv::Scalar lo {165, 240, 143}, hi {178, 255, 255};
-    cv::Mat bw;
-    cv::inRange(img, lo, hi, bw);
-    *((cv::Mat*) ptrToImgMat) = bw;
+    cv::Mat &raw = *(cv::Mat*) ptrToImgMat;
+    cv::Mat led;
+    detect_led(raw, led);
+    *((cv::Mat*) ptrToImgMat) = led;
 }
 
 JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_process(JNIEnv *env,
@@ -66,9 +98,12 @@ JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_process(JNIEnv *env,
 
     auto compartment_width = img.cols / NUM_COMPARTMENTS;
 
+    // cv::Mat gray;
+    // cv::cvtColor(img, gray, CV_BGR2GRAY);
+    // cv::blur(gray, gray, cv::Size {3, 3});
+
     cv::Mat gray;
-    cv::cvtColor(img, gray, CV_BGR2GRAY);
-    cv::blur(gray, gray, cv::Size {3, 3});
+    detect_led(img, gray);
 
     cv::Mat canny;
     std::vector<std::vector<cv::Point>> contours;
@@ -87,7 +122,7 @@ JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_process(JNIEnv *env,
         auto maxdist = cv::arcLength(contour, /* closed= */ true) * 0.02;
         cv::approxPolyDP(contour, contour, maxdist, /* closed= */ true);
         
-        if (contour.size() == 4) {
+        if (true) {
             cv::drawContours(img, contours, i, cv::Scalar {0, 255, 0}, 2, 8, hierarchy, 0, cv::Point {});
             cv::Point cog = center_of_gravity(contour);
             cv::circle(img, cog, 2, BLUE, -1);

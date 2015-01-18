@@ -23,7 +23,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
     private static final int NUM_COMPARTMENTS = 12;
     private CameraBridgeViewBase cameraView = null;
     private BlurType blurType = BlurType.GAUSSIAN;
-    private byte state = 0;
+    private byte state = 1;
     private SoundPool soundPool = new SoundPool.Builder()
                                       .setMaxStreams(NUM_COMPARTMENTS)
                                       .build();
