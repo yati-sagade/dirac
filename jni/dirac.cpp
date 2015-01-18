@@ -93,28 +93,25 @@ JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_process(JNIEnv *env,
                                                                 jboolean onlyRects,
                                                                 jfloat minAreaFraction,
                                                                 jfloat maxAreaFraction) {
-    cv::Mat &img = *(cv::Mat*) ptrToImgMat; 
+    cv::Mat &raw = *(cv::Mat*) ptrToImgMat;
+    cv::Mat led;
+
+    detect_led(raw, led);
+
     cv::Mat *result = (cv::Mat*) ptrToResultMat;
 
-    auto compartment_width = img.cols / NUM_COMPARTMENTS;
-
-    // cv::Mat gray;
-    // cv::cvtColor(img, gray, CV_BGR2GRAY);
-    // cv::blur(gray, gray, cv::Size {3, 3});
-
-    cv::Mat gray;
-    detect_led(img, gray);
+    auto compartment_width = raw.cols / NUM_COMPARTMENTS;
 
     cv::Mat canny;
     std::vector<std::vector<cv::Point>> contours;
     std::vector<cv::Vec4i> hierarchy;
 
-    cv::Canny(gray, canny, 50, 150, 3);
+    cv::Canny(led, canny, 50, 150, 3);
     cv::findContours(canny, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, cv::Point {0, 0});
 
     std::set<int> active_compartments;
 
-    cv::Point mid {img.cols / 2, img.rows / 2};
+    cv::Point mid {raw.cols / 2, raw.rows / 2};
     std::stringstream ss;
     for (int i = 0; i < contours.size(); ++i) {
         auto& contour = contours[i];
@@ -123,13 +120,13 @@ JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_process(JNIEnv *env,
         cv::approxPolyDP(contour, contour, maxdist, /* closed= */ true);
         
         if (true) {
-            cv::drawContours(img, contours, i, cv::Scalar {0, 255, 0}, 2, 8, hierarchy, 0, cv::Point {});
+            cv::drawContours(raw, contours, i, cv::Scalar {0, 255, 0}, 2, 8, hierarchy, 0, cv::Point {});
             cv::Point cog = center_of_gravity(contour);
-            cv::circle(img, cog, 2, BLUE, -1);
+            cv::circle(raw, cog, 2, BLUE, -1);
             auto comp_index = cog.x / compartment_width;
             if (active_compartments.find(comp_index) == active_compartments.end()) {
                 active_compartments.insert(comp_index);
-                activate_compartment(img, compartment_width, comp_index);
+                activate_compartment(raw, compartment_width, comp_index);
                 ss << comp_index;
                 if (i != contours.size() - 1) {
                     ss << ",";
@@ -137,8 +134,8 @@ JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_process(JNIEnv *env,
             }
         }
     }
-    cv::putText(img, ss.str(), mid, cv::FONT_HERSHEY_PLAIN, 1.0, BLUE);
-    draw_compartments(img);
+    cv::putText(raw, ss.str(), mid, cv::FONT_HERSHEY_PLAIN, 1.0, BLUE);
+    draw_compartments(raw);
 
     result->create(active_compartments.size(), 1, CV_32SC1);
     int i = 0;
