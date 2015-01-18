@@ -23,6 +23,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
     private static final int NUM_COMPARTMENTS = 12;
     private CameraBridgeViewBase cameraView = null;
     private BlurType blurType = BlurType.GAUSSIAN;
+    private byte state = 0;
     private SoundPool soundPool = new SoundPool.Builder()
                                       .setMaxStreams(NUM_COMPARTMENTS)
                                       .build();
@@ -105,11 +106,11 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.gaussian:
-                blurType = BlurType.GAUSSIAN;
+            case R.id.main:
+                state = 0;
                 return true;
-            case R.id.median:
-                blurType = BlurType.MEDIAN;
+            case R.id.test:
+                state = 1;
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -118,10 +119,21 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
 
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
         Mat rgba = inputFrame.rgba();
-        MatOfInt result = new MatOfInt();
-        process(rgba.nativeObj, result.nativeObj);
-        Set<Integer> indices = new HashSet(result.toList());
-        playSounds(indices);
+        Util.log("Got: " + rgba.cols() + "," + rgba.rows());
+        switch (state) {
+            case 0:
+                MatOfInt result = new MatOfInt();
+                process(rgba.nativeObj, result.nativeObj, true, 0.0f, 0.0f);
+                Set<Integer> indices = new HashSet(result.toList());
+                Util.log("Got " + indices.size() + " indices");
+                playSounds(indices);
+                break;
+
+            case 1:
+                find(rgba.nativeObj);
+                break;
+        }
+        Util.log("Going to return: " + rgba.cols() + "," + rgba.rows());
         return rgba;
     }
 
@@ -173,6 +185,12 @@ public class MainActivity extends Activity implements CvCameraViewListener2 {
     }
 
     // Returns the index of the currently active compartment.
-    private native int process(long ptrToImgMat, long ptrToResultMat);
+    private native int process(long ptrToImgMat,
+                               long ptrToResultMat,
+                               boolean onlyRects,
+                               float minArea,
+                               float maxArea);
+
+    private native int find(long ptrToImgMat);
 
 }

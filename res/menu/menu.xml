@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <item android:id="@+id/gaussian"
-          android:title="gaussian" />
+    <item android:id="@+id/main"
+          android:title="main" />
 
-    <item android:id="@+id/median"
-          android:title="median" />
+    <item android:id="@+id/test"
+          android:title="test" />
 
 </menu>
 

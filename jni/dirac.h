@@ -30,7 +30,7 @@ extern "C" {
  * Signature: (J)V
  */
 JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_process
-  (JNIEnv *, jobject, jlong, jlong);
+  (JNIEnv *, jobject, jlong, jlong, jboolean, jfloat, jfloat);
 
 #ifdef __cplusplus
 } // extern "C"

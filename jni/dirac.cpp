@@ -42,7 +42,25 @@ static void activate_compartment(cv::Mat& img, unsigned short comp_width, size_t
     cv::rectangle(img, top_left, bot_right, cv::Scalar {255, 0, 0, 100}, -1);
 }
 
-JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_process(JNIEnv *env, jobject obj, jlong ptrToImgMat, jlong ptrToResultMat) {
+JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_find(JNIEnv *env,
+                                                             jobject obj,
+                                                             jlong ptrToImgMat)
+{
+    cv::Mat &img = *(cv::Mat*) ptrToImgMat;
+    cv::cvtColor(img, img, CV_RGB2HSV); 
+    cv::Scalar lo {165, 240, 143}, hi {178, 255, 255};
+    cv::Mat bw;
+    cv::inRange(img, lo, hi, bw);
+    *((cv::Mat*) ptrToImgMat) = bw;
+}
+
+JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_process(JNIEnv *env,
+                                                                jobject obj,
+                                                                jlong ptrToImgMat,
+                                                                jlong ptrToResultMat,
+                                                                jboolean onlyRects,
+                                                                jfloat minAreaFraction,
+                                                                jfloat maxAreaFraction) {
     cv::Mat &img = *(cv::Mat*) ptrToImgMat; 
     cv::Mat *result = (cv::Mat*) ptrToResultMat;
 
@@ -65,16 +83,22 @@ JNIEXPORT jint JNICALL Java_com_ysag_dirac_MainActivity_process(JNIEnv *env, job
     std::stringstream ss;
     for (int i = 0; i < contours.size(); ++i) {
         auto& contour = contours[i];
-        cv::drawContours(img, contours, i, cv::Scalar {0, 255, 0}, 2, 8, hierarchy, 0, cv::Point {});
-        cv::Point cog = center_of_gravity(contour);
-        cv::circle(img, cog, 2, BLUE, -1);
-        auto comp_index = cog.x / compartment_width;
-        if (active_compartments.find(comp_index) == active_compartments.end()) {
-            active_compartments.insert(comp_index);
-            activate_compartment(img, compartment_width, comp_index);
-            ss << comp_index;
-            if (i != contours.size() - 1) {
-                ss << ",";
+
+        auto maxdist = cv::arcLength(contour, /* closed= */ true) * 0.02;
+        cv::approxPolyDP(contour, contour, maxdist, /* closed= */ true);
+        
+        if (contour.size() == 4) {
+            cv::drawContours(img, contours, i, cv::Scalar {0, 255, 0}, 2, 8, hierarchy, 0, cv::Point {});
+            cv::Point cog = center_of_gravity(contour);
+            cv::circle(img, cog, 2, BLUE, -1);
+            auto comp_index = cog.x / compartment_width;
+            if (active_compartments.find(comp_index) == active_compartments.end()) {
+                active_compartments.insert(comp_index);
+                activate_compartment(img, compartment_width, comp_index);
+                ss << comp_index;
+                if (i != contours.size() - 1) {
+                    ss << ",";
+                }
             }
         }
     }
